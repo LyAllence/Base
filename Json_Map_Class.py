@@ -4,39 +4,43 @@ import json
 import os
 
 
-class A(object):
+class B(object):
     def __init__(self, age):
         self.age = age
 
-    def __str__(self):
-        return 'age:' + str(self.age)
+
+class A(object):
+    def __init__(self, b):
+        self.b = b
 
 
-# the return cannot include any not seriable var; if it has , we will call the function again, and obj is the var
-def parse(a):
-    print('start===')
+# the return cannot include any not parse var; if it has ,
+# we will call the function again, and obj is the var, you can parse the var
+def parse_b(one):
     return {
-        'age': a.age,
+        'age': one.age
     }
 
 
+def parse(a):
+    return {
+        'b': json.dumps(obj=a.b, default=parse_b),
+    }
+
+
+def load_b(d_one):
+    return B(d_one['age'])
+
+
 def load(d):
-    return A(d['age'])
+    return A(json.loads(d['b'], object_hook=load_b))
 
 
-list_A = []
-if os.path.exists(os.path.join(os.path.abspath('.'), 'data.json')):
-    f_load = open(os.path.join(os.path.abspath('.'), 'data.json'), 'r')
-    load_A = json.load(fp=f_load)
-    f_load.close()
-    list_load_A = list(load_A.values())
-    list_A = [json.loads(i, object_hook=load) for i in list_load_A]
-else:
-    list_A = [A(1), A(2), A(3)]
-    map_A = {}
-    for column, i in enumerate(list_A):
-        map_A[column] = json.dumps(obj=i, default=parse)
-    f_dump = open(os.path.join(os.path.abspath('.'), 'data.json'), 'w')
-    json.dump(obj=map_A, fp=f_dump)
-    f_dump.close()
-print(list_A)
+a = A(B(12))
+dumps_a = json.dumps(obj=a, default=parse)
+print('this is dumps data:', dumps_a)
+print('type is:', type(dumps_a))
+print('=======')
+loads_a = json.loads(dumps_a, object_hook=load)
+print('this is loads data:', loads_a)
+print('type is:', type(loads_a))
