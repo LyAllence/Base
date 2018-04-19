@@ -12,6 +12,7 @@ class A(object):
         return 'age:' + str(self.age)
 
 
+# the return cannot include any not seriable var;
 def parse(a):
     print('start===')
     return {
