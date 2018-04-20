@@ -44,3 +44,6 @@ print('=======')
 loads_a = json.loads(dumps_a, object_hook=load)
 print('this is loads data:', loads_a)
 print('type is:', type(loads_a))
+
+#summary: the data of json cannot have dict or other withour cannnot json.dump
+
