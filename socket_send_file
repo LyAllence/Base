@@ -3,6 +3,7 @@ import socketserver
 import threading
 import time
 import os
+import json
 
 path = os.path.abspath('.')
 filename = 'a.txt'
@@ -13,18 +14,23 @@ class Temp_Server(socketserver.StreamRequestHandler):
 
     def handle(self):
         if self.request.recv(20).decode() == 'get_data':
-            self.request.sendall(filename.encode())
-            if self.request.recv(20).decode() == 'ok':
-                num = 1
-                with open(os.path.join(path, filename), 'r') as f:
-                    message = f.read(1024)
-                    while len(message) == 1024:
-                        self.request.sendall(message.encode())
-                        f.seek(num * 1024)
-                        num += 1
-                        message = f.read(1024)
-                    self.request.sendall(message.encode())
-                    self.request.sendall('EOF'.encode())
+            with open(os.path.join(path, filename), 'r') as f:
+                messages = f.readlines()
+            message = ''
+            for i in messages:
+                message = message + i + '\n'
+            size = len(message)
+            info = {
+                'filename': filename,
+                'size': size,
+            }
+            self.request.sendall(json.dumps(info).encode())
+            if self.request.recv(10).decode() == 'CONTINUE':
+                while size > 1024:
+                    self.request.send(message[:1024].encode())
+                    message = message[1024:]
+                    size = len(message)
+                self.request.send(message.encode())
 
 
 # client
@@ -33,14 +39,20 @@ def temp_client():
     try:
         client.connect(('127.0.0.1', 20012))
         client.send('get_data'.encode())
-        client_filename = client.recv(20).decode()
-        print(client_filename)
-        client.send('ok'.encode())
-        message = client.recv(1024).decode()
-        with open(os.path.join(path, client_filename + '1'), 'a') as f:
-            while message != 'EOF':
-                f.write(message)
+        client_data = client.recv(100).decode()
+        data = json.loads(client_data)
+        print(data)
+        client_filename = data['filename']
+        size = data['size']
+        client.send('CONTINUE'.encode())
+        with open(os.path.join(path, client_filename + '1'), 'w') as f:
+            while size > 1024:
                 message = client.recv(1024).decode()
+                print(message)
+                f.write(message)
+                size -= 1024
+            message = client.recv(size).decode()
+            f.write(message)
     finally:
         client.close()
 
