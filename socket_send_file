@@ -4,6 +4,7 @@ import threading
 import time
 import os
 import json
+import struct
 
 path = os.path.abspath('.')
 filename = 'a.txt'
@@ -24,7 +25,8 @@ class Temp_Server(socketserver.StreamRequestHandler):
                 'filename': filename,
                 'size': size,
             }
-            self.request.sendall(json.dumps(info).encode())
+            info_pack = struct.pack('100s', json.dumps(info).encode())
+            self.request.sendall(info_pack)
             if self.request.recv(10).decode() == 'CONTINUE':
                 while size > 1024:
                     self.request.send(message[:1024].encode())
@@ -39,11 +41,13 @@ def temp_client():
     try:
         client.connect(('127.0.0.1', 20012))
         client.send('get_data'.encode())
-        client_data = client.recv(100).decode()
-        data = json.loads(client_data)
-        print(data)
-        client_filename = data['filename']
-        size = data['size']
+        client_data = client.recv(100)
+        client_unpack = struct.unpack('100s', client_data)[0].decode()
+        client_info = client_unpack[:client_unpack.index('}') + 1]
+        print(client_info)
+        client_load = json.loads(client_info)
+        client_filename = client_load['filename']
+        size = client_load['size']
         client.send('CONTINUE'.encode())
         with open(os.path.join(path, client_filename + '1'), 'w') as f:
             while size > 1024:
