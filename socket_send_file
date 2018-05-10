@@ -64,7 +64,7 @@ def temp_client():
         client.close()
 
 ###
-# this is udp socket programmer
+# this is udp socket programmer, and you caution that your cannot send bytes too much, witless you will get 'too long bytes'
 ###
 # coding: utf-8
 
