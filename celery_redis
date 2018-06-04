@@ -1,0 +1,22 @@
+server(need start redis server):
+from celery import Celery, Task
+app = Celery('tasks',  backend='redis://localhost:6379/0', broker='redis://localhost:6379/0')
+
+
+@app.task
+def send_http(url, method, data):
+    return url + method + data
+
+runserver: celery worker -A http_celery --loglevel=info
+
+client:
+from http_celery import send_http
+import json
+import time
+
+result = send_http.delay('http://baidu.com', 'Post', json.dumps({'a': 23}))
+
+# receive result
+#while not result.ready():
+#    time.sleep(1)
+#print(result.get())
