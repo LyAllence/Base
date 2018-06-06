@@ -1,0 +1,86 @@
+# -*- coding: utf-8 -*-
+
+from Crypto import Random
+from Crypto.Hash import SHA
+from Crypto.Cipher import PKCS1_v1_5 as Cipher_v1_5
+from Crypto.Signature import PKCS1_v1_5 as Sign_v1_5
+from Crypto.PublicKey import RSA
+import base64
+
+
+###
+# generate key files
+###
+def generate_keys():
+    random_master = Random.new().read
+    rsa_master = RSA.generate(1024, random_master)
+
+    private_pem = rsa_master.exportKey()
+
+    with open('master-private.pem', 'w') as master_file:
+        master_file.write(private_pem.decode())
+
+    public_pem = rsa_master.publickey().exportKey()
+    with open('master-public.pem', 'w') as master_file:
+        master_file.write(public_pem.decode())
+
+    random_ghost = Random.new().read
+    rsa_ghost = RSA.generate(1024, random_ghost)
+
+    private_pem = rsa_ghost.exportKey()
+    with open('ghost-private.pem', 'w') as ghost_file:
+        ghost_file.write(private_pem.decode())
+
+    public_pem = rsa_ghost.publickey().exportKey()
+    with open('ghost-public.pem', 'w') as ghost_file:
+        ghost_file.write(public_pem.decode())
+
+
+###
+# encrypt a message use ghost public
+###
+def encrypt_message(message):
+    with open('ghost-public.pem', 'r') as encrypt_file:
+        encrypt_key = encrypt_file.read()
+        encrypt_rsa_key = RSA.importKey(encrypt_key)
+        encrypt_cipher = Cipher_v1_5.new(encrypt_rsa_key)
+    return base64.b64encode(encrypt_cipher.encrypt(message.encode()))
+
+
+def decrypt_message(decrypt_text):
+    random_generator = Random.new().read
+    with open('ghost-private.pem') as decrypt_file:
+        decrypt_key = decrypt_file.read()
+        decrypt_rsa_key = RSA.importKey(decrypt_key)
+        decrypt_cipher = Cipher_v1_5.new(decrypt_rsa_key)
+        text = decrypt_cipher.decrypt(base64.b64decode(decrypt_text), random_generator)
+    return text.decode()
+
+
+def signature_message(message):
+    with open('master-private.pem') as signature_file:
+        signature_key = signature_file.read()
+        signature_rsa_key = RSA.importKey(signature_key)
+        signature_signer = Sign_v1_5.new(signature_rsa_key)
+        signature_digest = SHA.new()
+        signature_digest.update(message.encode())
+        signature_sign = signature_signer.sign(signature_digest)
+    return base64.b64encode(signature_sign)
+
+
+def verify_signature(signature_text, signature):
+    with open('master-public.pem') as verify_file:
+        verify_key = verify_file.read()
+        verify_rsa_key = RSA.importKey(verify_key)
+        verify_verifier = Sign_v1_5.new(verify_rsa_key)
+        digest = SHA.new()
+        digest.update(signature_text.encode())
+    return verify_verifier.verify(digest, base64.b64decode(signature))
+
+
+if __name__ == '__main__':
+    generate_keys()
+    encrypt_text_main = encrypt_message('all function is waiting!!!')
+    decrypt_text_main = decrypt_message(encrypt_text_main)
+    sign_text = signature_message('all function is signature')
+    print(verify_signature('all function is signature', sign_text))
