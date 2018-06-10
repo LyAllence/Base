@@ -1,0 +1,195 @@
+from multiprocessing import Pool
+import threading
+from hashlib import sha256
+
+
+class BinTree(object):
+
+    # init variable
+    root_hash = '0000000000000000000000000000000000000000000000000000000000000000'
+    initialize_hash = root_hash
+    tree_memory = {}
+    result = {}
+
+    # This is tree leave structure, And data from user,
+    # And it's type is dict
+    class Leave(object):
+        def __init__(self):
+            self.parent_hash = None
+            self.hash = None
+            self.left_children_hash = None
+            self.right_children_hash = None
+            self.data = None
+
+    # In here, We need override some function
+    def __new__(cls, *args, **kwargs):
+        if BinTree.initialize_hash == 768:
+            return object.__new__(cls)
+        else:
+            raise BaseException('Exception: The Class Cannot Init!')
+
+    # The function will initial the BinTree
+    # We will generate root leave in here
+    # No parameter
+    # return:
+    @staticmethod
+    def initialize():
+        BinTree.initialize_hash = 3 << 8
+        bin_tree = BinTree()
+        root_leave = bin_tree.Leave()
+        root_leave.data = 'this is root leave we generate'
+        root_leave.hash = BinTree.root_hash
+        bin_tree.tree_memory.setdefault(root_leave.hash, root_leave)
+        return bin_tree
+
+    # function insert
+    # parameter
+    def insert(self, leave_data):
+
+        # check data
+        if not isinstance(leave_data, type({})):
+            return False, 'Error: your data is error, it must be dict'
+
+        # generate a leave, data is parameter
+        leave_temp = self.Leave()
+        leave_temp.data = leave_data
+
+        # If no children leave in here, insert in here'
+        leave_root = self.tree_memory.get(self.root_hash)
+        leave_list = [leave_root]
+
+        # Insert, because we must insert well, so use True
+        while True:
+
+            next_leave_list = []
+
+            for leave in leave_list:
+                if not leave.data:
+                    BinTree.tree_memory.get(leave.hash).data = leave_data
+                    return True, 'Success: the leave\'s hash is {}'.format(leave.hash)
+
+            for leave in leave_list:
+                # Left leave is None
+                if not leave.left_children_hash or not leave.right_children_hash:
+                    # Specify parent hash
+                    leave_temp.parent_hash = leave.hash
+                    # Generate hash and change parent leave's left leave hash
+                    leave_temp.hash = BinTree.generate_hash(leave_temp)
+                    if leave.left_children_hash:
+                        BinTree.tree_memory.get(leave.hash).right_children_hash = leave_temp.hash
+                    else:
+                        BinTree.tree_memory.get(leave.hash).left_children_hash = leave_temp.hash
+
+                    BinTree.tree_memory.setdefault(leave_temp.hash, leave_temp)
+
+                    # Clean list when quit
+                    del next_leave_list
+                    del leave_list
+                    return True, 'Success: the leave\'s hash is {}'.format(leave_temp.hash)
+                else:
+                    # Add leave in next level
+                    next_leave_list.append(BinTree.tree_memory.get(leave.left_children_hash))
+                    next_leave_list.append(BinTree.tree_memory.get(leave.right_children_hash))
+
+                leave_list = next_leave_list[:]
+
+    # The function Will find key in data.
+    # return: exist, hash, data
+    def get(self, key, value):
+
+        # If no children leave in here, return 'KeyError'
+        leave_root = self.tree_memory.get(self.root_hash)
+        if not leave_root.left_children_hash and not leave_root.right_children_hash:
+            return False, None, 'Error: The key is error or the tree have no leave'
+
+        result_flag = False
+        result_hash = None
+        pre_leave_list = [leave_root]
+
+        while not result_flag:
+
+            leave_list = []
+
+            # Get next level leaves
+            for i in pre_leave_list:
+                if i.left_children_hash:
+                    leave_list.append(BinTree.tree_memory.get(i.left_children_hash))
+                if i.right_children_hash:
+                    leave_list.append(BinTree.tree_memory.get(i.right_children_hash))
+
+            # If the tree have no the key and value, return Error
+            if not leave_list:
+                return False, None, 'Error: The key is error or the tree have no leave'
+
+            # update pre list
+            pre_leave_list = leave_list[:]
+
+            # check key and value in this level
+            result_flag, result_hash = self.check_key_value(key, value, leave_list)
+
+            del leave_list
+
+        return True, result_hash, self.tree_memory.get(result_hash).data
+
+    @staticmethod
+    def check_key_value(key, value, leave_list):
+        BinTree.result['result'] = False
+        BinTree.result['hash'] = None
+        BinTree.result['response'] = 0
+        BinTree.result['list'] = len(leave_list)
+        while BinTree.result['response'] != BinTree.result['list']:
+
+            # start thread to check
+            if threading.activeCount() < 20 and leave_list:
+                threading.Thread(target=BinTree.check_key_value_per, args=(key, value, leave_list.pop(0))).start()
+
+        return BinTree.result['result'], BinTree.result['hash']
+
+    @staticmethod
+    def check_key_value_per(key, value, leave):
+        try:
+            if isinstance(leave, BinTree.Leave) and leave.data \
+                    and key in leave.data and leave.data.get(key) == value:
+                BinTree.result['hash'] = leave.hash
+                BinTree.result['result'] = True
+        finally:
+            BinTree.result['response'] += 1
+
+    @staticmethod
+    def generate_hash(leave):
+        message = str(leave.data) + str(leave.parent_hash)
+        sha = sha256()
+        sha.update(message.encode())
+        return sha.hexdigest()
+
+    def update(self, key, old_value, new_data):
+        exist, leave_hash, data = self.get(key, old_value)
+        if exist:
+            BinTree.tree_memory.get(leave_hash).data = new_data
+            return 'Success: update success!'
+        else:
+            return data
+
+    def delete(self, key, value):
+
+        exist, leave_hash, data = self.get(key, value)
+        if exist:
+            BinTree.tree_memory.get(leave_hash).data = None
+            return 'Success: delete success!'
+        else:
+            return data
+
+
+if __name__ == '__main__':
+    b = BinTree.initialize()
+    print('insert', b.insert({'a': 5}))
+    print('insert', b.insert({'q': 5}))
+    print('insert', b.insert({'w': 5}))
+    print('insert', b.insert({'e': 5}))
+    print('a5 get', b.get('a', 5))
+    print('update', b.update('a', 5, {'b': 5}))
+    print('a5 get', b.get('a', 5))
+    print('b5 get', b.get('b', 5))
+    print('b5 delete', b.delete('b', 5))
+    print('b5 get', b.get('b', 5))
+    print('e5 get', b.get('e', 5))
