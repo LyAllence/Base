@@ -1,0 +1,13 @@
+import requests
+
+url = 'https://www.feixiaohao.com'
+
+# send_headers = {
+#     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/'
+#                   '537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36',
+# }
+# r = requests.get(url=url, headers=send_headers)
+r = requests.get("https://www.feixiaohao.com/list_2.html")
+r.encoding = r.apparent_encoding
+print(r.status_code)
+print(r.text.replace(' ', '\n'))
